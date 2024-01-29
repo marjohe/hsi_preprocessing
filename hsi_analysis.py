@@ -34,4 +34,5 @@ def group_cu3s_files(base_dir):
 if __name__ == "__main__":
     image_dir = "C:\\Users\\Martin\\Desktop\\2023_11_21_10-37-01\\images"
     hsi_dict = group_cu3s_files(image_dir)
+
     print("fin")
