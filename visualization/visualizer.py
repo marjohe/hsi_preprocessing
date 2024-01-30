@@ -11,13 +11,23 @@ from hsi_processor import HSIProcessor
 
 
 class HSIViewer(QMainWindow):
-    def __init__(self, images, wavelengths):
+    def __init__(self, file_list):
         super().__init__()
-        self.images = images  # List of hyperspectral images
-        self.wavelengths = wavelengths
+        self.hsi_processor = HSIProcessor()
+        self.images =  self.load_images(file_list) # List of hyperspectral images
+        self.wavelengths = self.hsi_processor.get_wavelengths()
         self.current_image_index = 0  # Index of the current image being viewed
         self.last_clicked_point = None
         self.initUI()
+
+    def load_images(self, file_list):
+
+        hsi_list = []
+        for file in file_list:
+            measurement,_ = self.hsi_processor.load_measurement(file)
+            hsi  =self.hsi_processor.measurement_2_arr(measurement)
+            hsi_list.append(hsi)
+        return hsi_list
 
     def initUI(self):
         self.setWindowTitle('Hyperspectral Image Viewer')
@@ -89,9 +99,11 @@ class HSIViewer(QMainWindow):
             # Plotting the spectrum
             self.spectrum_ax.clear()
             self.spectrum_ax.plot(self.wavelengths, current_image[y, x, :])
+            self.spectrum_ax.set_ylim([0,1])
             self.spectrum_ax.set_title('Spectrum at '+ f'{y,x}')
             self.spectrum_ax.set_xlabel('Wavelength (nm)')
             self.spectrum_ax.set_ylabel('Intensity')
+
 
             # Marking the selected wavelength on the spectrum
             selected_wavelength = self.wavelengths[channel]
@@ -119,7 +131,7 @@ class HSIViewer(QMainWindow):
 
 def group_cu3s_files(base_dir):
     file_dict = {}
-
+    file_list = []
     # Walk through the directory
     for root, dirs, files in os.walk(base_dir):
         # Skip the root directory itself
@@ -138,8 +150,10 @@ def group_cu3s_files(base_dir):
             # Add to dictionary
             if cu3s_files:
                 file_dict.setdefault(patient_name, {}).setdefault(body_part, []).extend(cu3s_files)
+                for file in cu3s_files:
+                    file_list.append(file)
 
-    return file_dict
+    return file_dict, file_list
 
 
 if __name__ == "__main__":
@@ -150,7 +164,8 @@ if __name__ == "__main__":
     processor = HSIProcessor()
     wavelengths = processor.get_wavelengths()
 
-    hsi_dict = group_cu3s_files(image_dir)
+    hsi_dict, file_list = group_cu3s_files(image_dir)
+    """
     images= []
     for patient_id, patient_dict in hsi_dict.items():
         for body_part, image_list in patient_dict.items():
@@ -159,7 +174,9 @@ if __name__ == "__main__":
                 hsi = processor.measurement_2_arr(measurement)
                 images.append(hsi)
 
+    """
+
     app = QApplication(sys.argv)
-    ex = HSIViewer(images, wavelengths)
+    ex = HSIViewer(file_list)
     ex.show()
     sys.exit(app.exec_())
