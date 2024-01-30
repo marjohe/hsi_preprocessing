@@ -40,42 +40,14 @@ def group_cu3s_files(base_dir):
     return file_dict
 
 
-def annotate(hsi_dict, annotation_type, out_dir):
-
-    json_path = os.path.join(out_dir, annotation_type+'.json')
-    annotated_dict = {}
-    processor = HSIProcessor()
-    wavelengths = processor.get_wavelengths()
-
-    for patient_id, patient_dict in hsi_dict.items():
-        annotated_dict.update({patient_id: {}})
-        for body_part, image_list in patient_dict.items():
-            annotated_dict[patient_id].update({body_part: {}})
-            i = 0
-            for image in image_list:
-                annotated_dict[patient_id][body_part].update({i: {}})
-                measurement, session = processor.load_measurement(image)
-                hsi = processor.measurement_2_arr(measurement)
-
-                ex = HSIViewer(hsi, wavelengths)
-                ex.show()
-
-
-                coords = ex.get_coordinates()
-
-                image_dict = {'image_path': image, 'annotation_type': annotation_type, 'coordinates': coords}
-                annotated_dict[patient_id][body_part][i].update(image_dict)
-
-            save_json(annotated_dict, json_path)
-
-    return annotated_dict
-
-
 if __name__ == "__main__":
-    image_dir = "C:\\Users\\C140_Martin\\Downloads\\2023_11_21_10-37-01(1)\\images"
-    out_dir = "C:\\Users\\C140_Martin\\Desktop\\hsi_annotations"
-    hsi_dict = group_cu3s_files(image_dir)
+    image_dir = "C:\\Users\\C140_Martin\\Desktop\\hsi_test_data\\images"
+    annotation_dir = "C:\\Users\\C140_Martin\\Desktop\\hsi_test_data\\annotations"
 
-    annotated_dict = annotate(hsi_dict, 'skin', out_dir)
+    # TODO: Create function to map annotations and images
+    # TODO: Function to parse annotation files
+    # TODO: Create function to aggregate by patient, localization.
+    # TODO: UMAP plots over locations, patients, lesions
+
 
     print("fin")
