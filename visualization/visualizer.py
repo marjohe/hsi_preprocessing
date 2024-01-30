@@ -1,27 +1,58 @@
 import sys
 import os
 import glob
-import numpy as np
+
 import matplotlib.pyplot as plt
+
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSlider, QLabel, QVBoxLayout, QWidget, QPushButton
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from PyQt5.QtWidgets import QDialog, QLineEdit, QMessageBox
 from PyQt5.QtCore import Qt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+
 
 from hsi_processor import HSIProcessor
 
 
+class AnnotationDialog(QDialog):
+    def __init__(self, parent=None):
+        super(AnnotationDialog, self).__init__(parent)
+        self.setWindowTitle('Enter Annotation Details')
+        self.setGeometry(100, 100, 300, 200)
+
+        self.annotation_type = QLineEdit(self)
+        self.location = QLineEdit(self)
+        self.patient = QLineEdit(self)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel('Annotation Type:'))
+        layout.addWidget(self.annotation_type)
+        layout.addWidget(QLabel('Location:'))
+        layout.addWidget(self.location)
+        layout.addWidget(QLabel('Patient:'))
+        layout.addWidget(self.patient)
+
+        self.save_button = QPushButton('Save', self)
+        self.save_button.clicked.connect(self.accept)
+        layout.addWidget(self.save_button)
+
+    def get_details(self):
+        return self.annotation_type.text(), self.location.text(), self.patient.text()
+
+
+
 class HSIViewer(QMainWindow):
-    def __init__(self, file_list):
+    def __init__(self, file_list, annotation_dir=""):
         super().__init__()
         self.hsi_processor = HSIProcessor()
-        self.images =  self.load_images(file_list) # List of hyperspectral images
+        self.file_list = file_list
+        self.images = self.load_images(file_list)  # List of hyperspectral images
         self.wavelengths = self.hsi_processor.get_wavelengths()
         self.current_image_index = 0  # Index of the current image being viewed
         self.last_clicked_point = None
+        self.annotation_dir = annotation_dir
         self.initUI()
 
     def load_images(self, file_list):
-
         hsi_list = []
         for file in file_list:
             measurement,_ = self.hsi_processor.load_measurement(file)
@@ -54,12 +85,21 @@ class HSIViewer(QMainWindow):
         self.coord_label = QLabel(self)
         self.coord_label.setAlignment(Qt.AlignCenter)
 
+        # Initialize the QLabel for displaying the current file name
+        self.file_name_label = QLabel(self)
+        self.file_name_label.setAlignment(Qt.AlignCenter)
+
+        # Create a Save Coordinates Button
+        self.save_coord_button = QPushButton('Save Coordinates', self)
+        self.save_coord_button.clicked.connect(self.save_coordinates)
+
         # Layout
         layout = QVBoxLayout()
         layout.addWidget(self.canvas)
         layout.addWidget(self.label)
         layout.addWidget(self.coord_label)
         layout.addWidget(self.slider)
+        layout.addWidget(self.save_coord_button)
 
         # Buttons for navigating images
         self.prev_button = QPushButton('Previous Image', self)
@@ -70,12 +110,13 @@ class HSIViewer(QMainWindow):
         # Update layout
         layout.addWidget(self.prev_button)
         layout.addWidget(self.next_button)
+        layout.addWidget(self.file_name_label)
 
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
-
         self.update_plot(0)
+        self.update_file_name_label()
 
     def changeValue(self, value):
         self.update_plot(value)
@@ -102,8 +143,7 @@ class HSIViewer(QMainWindow):
             self.spectrum_ax.set_ylim([0,1])
             self.spectrum_ax.set_title('Spectrum at '+ f'{y,x}')
             self.spectrum_ax.set_xlabel('Wavelength (nm)')
-            self.spectrum_ax.set_ylabel('Intensity')
-
+            self.spectrum_ax.set_ylabel('Reflectance')
 
             # Marking the selected wavelength on the spectrum
             selected_wavelength = self.wavelengths[channel]
@@ -113,12 +153,17 @@ class HSIViewer(QMainWindow):
         self.ax.set_title(f'Peak wavelength {self.wavelengths[channel]} nm')
         self.canvas.draw()
 
+    def update_file_name_label(self):
+        file_name = self.file_list[self.current_image_index]
+        self.file_name_label.setText(f'Current Image: {file_name}')
+
     def get_coordinates(self):
         return self.last_clicked_point
 
     def changeImage(self, index):
         self.current_image_index = index
         self.update_plot(self.slider.value())
+        self.update_file_name_label()
 
     def prev_image(self):
         if self.current_image_index > 0:
@@ -127,6 +172,21 @@ class HSIViewer(QMainWindow):
     def next_image(self):
         if self.current_image_index < len(self.images) - 1:
             self.changeImage(self.current_image_index + 1)
+
+    def save_coordinates(self):
+        if self.last_clicked_point is not None:
+            dialog = AnnotationDialog(self)
+            if dialog.exec_():
+                annotation_type, location, patient = dialog.get_details()
+                annotation_dir = os.path.join(self.annotation_dir, patient, location)
+                if not os.path.exists(annotation_dir):
+                    os.makedirs(annotation_dir)
+                with open(annotation_dir+'\\'+annotation_type+'.txt', 'a') as file:
+                    file.write(f"{self.file_list[self.current_image_index]}, {self.last_clicked_point}, {annotation_type}, {location}, {patient}\n")
+                QMessageBox.information(self, "Annotation Saved", "Annotation saved successfully.")
+        else:
+            QMessageBox.warning(self, "No Coordinates", "No coordinates to save. Please click on the image first.")
+
 
 
 def group_cu3s_files(base_dir):
@@ -160,23 +220,15 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.realpath(__file__))
     image_dir = "C:\\Users\\C140_Martin\\Desktop\\hsi_test_data\\small"
     torso_lesion = "C:\\Users\\C140_Martin\\Downloads\\2023_11_21_10-37-01\\p4\\stomach\\Auto_006_3284.cu3s"
+    annotation_dir = "C:\\Users\\C140_Martin\\Desktop\\hsi_test_data\\annotations"
+
     mesu_path = torso_lesion
     processor = HSIProcessor()
     wavelengths = processor.get_wavelengths()
 
     hsi_dict, file_list = group_cu3s_files(image_dir)
-    """
-    images= []
-    for patient_id, patient_dict in hsi_dict.items():
-        for body_part, image_list in patient_dict.items():
-            for image in image_list:
-                measurement, session = processor.load_measurement(image)
-                hsi = processor.measurement_2_arr(measurement)
-                images.append(hsi)
-
-    """
 
     app = QApplication(sys.argv)
-    ex = HSIViewer(file_list)
+    ex = HSIViewer(file_list, annotation_dir)
     ex.show()
     sys.exit(app.exec_())
