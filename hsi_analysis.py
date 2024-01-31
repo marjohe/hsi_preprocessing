@@ -5,6 +5,16 @@ import glob
 
 import numpy as np
 
+from PyQt5.QtWidgets import QApplication
+
+from visualization.visualizer import HSIViewer
+from hsi_processor import HSIProcessor
+
+
+def save_json(dict, path):
+    with open(path, 'w') as json_file:
+        json.dump(dict, json_file)
+
 
 def group_cu3s_files(base_dir):
     file_dict = {}
@@ -32,7 +42,13 @@ def group_cu3s_files(base_dir):
 
 
 if __name__ == "__main__":
-    image_dir = "C:\\Users\\Martin\\Desktop\\2023_11_21_10-37-01\\images"
-    hsi_dict = group_cu3s_files(image_dir)
+    image_dir = "C:\\Users\\Martin\\Desktop\\preliminary_work\\2023_11_21_10-37-01\\images"
+    annotation_dir = "C:\\Users\\Martin\\Desktop\\preliminary_work\\point_annotations"
+    
+    # TODO: Create function to map annotations and images
+    # TODO: Function to parse annotation files
+    # TODO: Create function to aggregate by patient, localization.
+    # TODO: UMAP plots over locations, patients, lesions
 
     print("fin")
+
