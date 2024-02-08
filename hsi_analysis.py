@@ -9,11 +9,45 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+import umap
+
 from pathlib import Path
 from PyQt5.QtWidgets import QApplication
 
 from visualization.visualizer import HSIViewer
 from hsi_processor import HSIProcessor
+
+
+def create_UMAP(df):
+    df_ref = df
+
+    df_ref = df_ref[df_ref['annotation_type'] == 'skin']
+
+    # Reshaping the DataFrame
+    reshaped_df = df_ref.pivot_table(index=['patient_id', 'body_part'], columns='wavelength',
+                                 values='reflectance').reset_index()
+
+    # Extract features and target
+    features = reshaped_df.drop(['body_part', 'patient_id'], axis=1).values
+    body_parts = reshaped_df['body_part'].values
+    #patient_ids = reshaped_df['patient_id'].values
+
+    for metric in ['correlation']:
+        for n in [5, 10, 20]:
+            for d in (0.1, 0.15, 0.25, 0.5, 0.8):
+
+                reducer = umap.UMAP(n_neighbors=n, min_dist=d, metric=metric)
+                embedding = reducer.fit_transform(features)
+                sns.set_theme(style="darkgrid")
+                # Plot
+                plt.figure(figsize=(10, 6))
+                for body_part in set(body_parts):
+                    indices = body_parts == body_part
+                    plt.scatter(embedding[indices, 0], embedding[indices, 1], label=body_part)
+                plt.title(f'UMAP plot with points colored by patient_id, metric={metric}, n={n},d={d}')
+                plt.legend(title='Body part', loc='upper left')
+                plt.show()
+
 
 
 def dict2dataframe(data_dict):
@@ -222,22 +256,25 @@ def read_dataframe(xlsx_path):
 if __name__ == "__main__":
     image_dir = "C:\\Users\\C140_Martin\\Desktop\\hsi_test_data\\images"
     annotation_file = "C:\\Users\\C140_Martin\\development\\hsi_preprocessing\\resources\\point_annotations.csv"
+    """
+    hsi_dict = group_cu3s_files(image_dir)
+    annotations = read_annotations(annotation_file)
 
-    #hsi_dict = group_cu3s_files(image_dir)
-    #annotations = read_annotations(annotation_file)
+    hsi_data_dict = map_annotations_to_images(hsi_dict, annotations)
 
-    #hsi_data_dict = map_annotations_to_images(hsi_dict, annotations)
+    print("Adding spectra...")
+    spec_dict = add_spectra(hsi_data_dict, kernel_size=7)
 
-    #spec_dict = add_spectra(hsi_data_dict, kernel_size=3)
+    print("Creating dataframe...")
+    df = dict2dataframe(spec_dict)
 
-    #df = dict2dataframe(spec_dict)
+    """
 
-    df = read_dataframe("C:\\Users\\C140_Martin\\development\\hsi_preprocessing\\resources\\dataframe.xlsx")
+    #df.to_excel("C:\\Users\\C140_Martin\\development\\hsi_preprocessing\\resources\\dataframe_k7.xlsx")
+    df = read_dataframe("C:\\Users\\C140_Martin\\development\\hsi_preprocessing\\resources\\dataframe_k7.xlsx")
 
-    df = df[df['body_part'] == 'arms']
-    #df = df[df['annotation_type'] != 'scar']
-    print(df.head())
-    #arms_skin_df = arms_df[arms_df['annotation_type'] == 'skin']
+    #df = df[df['body_part'] == 'arms']
+    #df = df[df['annotation_type'] == 'lesion']
 
     # Melt the DataFrame to have 'wavelength' and 'reflectance' columns
     df_melted = df.melt(id_vars=['image_name', 'patient_id', 'body_part', 'annotation_type'],
@@ -248,8 +285,10 @@ if __name__ == "__main__":
     df_melted['wavelength'] = pd.to_numeric(df_melted['wavelength'])
 
     print(df_melted.head())
+    #df_melted = df_melted[df_melted['annotation_type'] == 'skin']
 
     # Now you can plot using Seaborn
+
     sns.set_theme(style="darkgrid")
 
     # Example to plot error lines for 'lesion' annotation_type
@@ -258,10 +297,6 @@ if __name__ == "__main__":
 
     plt.xlabel('Wavelength (nm)')
     plt.ylabel('Reflectance')
-    plt.title('Reflectance Over Wavelengths for Lesion Annotation')
+    plt.title('Reflectance over wavelength of normal skin')
     plt.legend()
     plt.show()
-
-    # TODO: UMAP plots over locations, patients, lesions
-
-    print("fin")
